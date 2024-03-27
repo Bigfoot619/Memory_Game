@@ -14,12 +14,13 @@ screen = pygame.display.set_mode((screen_width, screen_height))
 white = (255, 255, 255)
 gray = (200, 200, 200)
 green = (0, 255, 0)
+black = (0, 0, 0)  # Added for timer text
 
 # Game Variables
 card_size = (100, 120)
-cards_rows = 4  # Updated to 4 rows
-cards_columns = 4  # Updated to 4 columns
-gap = 20  # Gap between cards increased for better visibility
+cards_rows = 4
+cards_columns = 4
+gap = 20
 
 # Generate pairs of numbers and shuffle them
 card_values = list(range(1, (cards_rows * cards_columns) // 2 + 1)) * 2
@@ -35,6 +36,9 @@ cards = [{'rect': pygame.Rect(col * (card_size[0] + gap) + gap, row * (card_size
           'value': card_values.pop(),
           'state': face_down} for row in range(cards_rows) for col in range(cards_columns)]
 
+# Timer start time
+start_time = time.time()
+
 def draw_cards():
     for card in cards:
         rect = card['rect']
@@ -48,6 +52,15 @@ def draw_cards():
         else:
             pygame.draw.rect(screen, screen.get_at((0, 0)), rect)
 
+def draw_timer():
+    current_time = time.time()
+    elapsed_time = current_time - start_time
+    minutes = int(elapsed_time // 60)
+    seconds = int(elapsed_time % 60)
+    font = pygame.font.Font(None, 40)
+    timer_text = font.render(f'{minutes:02d}:{seconds:02d}', True, black)
+    screen.blit(timer_text, (screen_width - 100, 10))
+
 def game_loop():
     running = True
     first_selection = None
@@ -56,7 +69,7 @@ def game_loop():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:  # Left click
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 for card in cards:
                     if card['rect'].collidepoint(event.pos) and card['state'] == face_down:
                         card['state'] = face_up
@@ -67,13 +80,14 @@ def game_loop():
                                 first_selection['state'] = card['state'] = matched
                             else:
                                 pygame.display.flip()
-                                time.sleep(0.7)  # Pause to show cards before flipping back
+                                time.sleep(0.7)
                                 first_selection['state'] = card['state'] = face_down
                             first_selection = None
                         break
 
         screen.fill(white)
         draw_cards()
+        draw_timer()
         pygame.display.flip()
 
 if __name__ == "__main__":
