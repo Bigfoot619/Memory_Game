@@ -1,100 +1,102 @@
-import pygame
 import random
-
-pygame.init()
+import pygame
 
 # Define some colors
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 GREY = (128, 128, 128)
 
-# Define screen dimensions
-WIDTH = 400
-HEIGHT = 400
+# Define the dimensions of the game screen
+WIDTH = 800
+HEIGHT = 600
+ROWS = 4
+COLS = 4
 
-# Define card size
-CARD_WIDTH = WIDTH // 4
-CARD_HEIGHT = HEIGHT // 4
-
-# Define font
-FONT = pygame.font.Font(None, 32)
-
-# Define game state variables
-board = []  # List to store card states (covered/uncovered)
-first_card = None  # Keeps track of the first clicked card
-second_card = None  # Keeps track of the second clicked card
-game_over = False
-
-# Function to initialize the game
-def init_game():
-  global board, first_card, second_card
-  # Create an empty board with covered cards
-  for _ in range(4):
-    board.append([False] * 4)
-  # Shuffle letters (A-H) twice to create pairs
-  letters = list("AABBCCDDEEFFGGHH")
-  random.shuffle(letters)
-  random.shuffle(letters)
-  # Assign letters to the board
-  for i in range(4):
-    for j in range(4):
-      board[i][j] = letters.pop()
-  # Reset card selection
-  first_card = None
-  second_card = None
-
-# Function to draw the game board
-def draw_board():
-  # Draw grid lines
-  for i in range(1, 4):
-    pygame.draw.line(screen, GREY, (0, i * CARD_HEIGHT), (WIDTH, i * CARD_HEIGHT), 2)
-    pygame.draw.line(screen, GREY, (i * CARD_WIDTH, 0), (i * CARD_WIDTH, HEIGHT), 2)
-  # Draw cards
-  for i in range(4):
-    for j in range(4):
-      color = WHITE if board[i][j] else GREY
-      pygame.draw.rect(screen, color, (j * CARD_WIDTH, i * CARD_HEIGHT, CARD_WIDTH, CARD_HEIGHT))
-      # Draw card text
-      text = FONT.render(board[i][j], True, BLACK)
-      text_rect = text.get_rect(center=(j * CARD_WIDTH + CARD_WIDTH // 2, i * CARD_HEIGHT + CARD_HEIGHT // 2))
-      if not board[i][j]:  # Only show text for uncovered cards
-        screen.blit(text, text_rect)
-
-
-# Function to handle user clicks
-def handle_click(pos):
-  global first_card, second_card
-  # Get the clicked card coordinates
-  x, y = pos
-  card_x = x // CARD_WIDTH
-  card_y = y // CARD_HEIGHT
-  # Check if a card is already clicked
-  if not board[card_y][card_x]:
-    # Reveal the clicked card
-    board[card_y][card_x] = True
-    if not first_card:
-      first_card = (card_x, card_y)
-    else:
-      second_card = (card_x, card_y)
-
-# Function to check for a match
-def check_match():
-  global first_card, second_card, game_over
-  if first_card and second_card and first_card != second_card:
-    # Check if cards match
-    if board[first_card[1]][first_card[0]] == board[second_card[1]][second_card[0]]:
-      # Cards match, keep them revealed
-      pass
-    else:
-      # Cards don't match, cover them again after a short delay
-      pygame.time.delay(1000)
-      board[first_card[1]][first_card[0]] = False
-      board[second_card[1]][second_card[0]] = False
-    first_card = None
-    second_card = None
-  # Check if all cards are matched (game won)
-  game_over = all(card for row in board for card in row)
-
-# Main game loop
+# Set up the screen
+pygame.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Memory Game")
+
+# Define card class
+class Card:
+    def __init__(self, content, x, y):
+        self.content = content
+        self.x = x
+        self.y = y
+        self.covered = True  # When true, card shows backside; when false, shows content
+
+    def draw(self):
+        if self.covered:
+            # Draw card backside
+            pygame.draw.rect(screen, GREY, (self.x, self.y, CARD_WIDTH, CARD_HEIGHT))
+        else:
+            # Draw card face with content
+            pygame.draw.rect(screen, WHITE, (self.x, self.y, CARD_WIDTH, CARD_HEIGHT))
+            font = pygame.font.Font(None, 50)
+            text = font.render(str(self.content), True, BLACK)
+            text_rect = text.get_rect(center=(self.x + CARD_WIDTH // 2, self.y + CARD_HEIGHT // 2))
+            screen.blit(text, text_rect)
+
+    def flip(self):
+        self.covered = not self.covered
+
+# Define constants
+CARD_WIDTH = WIDTH // COLS - 30  # Adjusting for margin
+CARD_HEIGHT = HEIGHT // ROWS - 30  # Adjusting for margin
+MARGIN = 20
+
+# Create a list of card content (replace with letters/numbers)
+card_contents = list("AABBCCDDEEFFGGHH")
+random.shuffle(card_contents)
+
+# Create a list of cards
+cards = []
+for i in range(ROWS):
+    for j in range(COLS):
+        content = card_contents[i * COLS + j]
+        card = Card(content, j * (CARD_WIDTH + MARGIN) + MARGIN, i * (CARD_HEIGHT + MARGIN) + MARGIN)
+        cards.append(card)
+
+# Game variables
+first_card = None
+second_card = None
+found = []  # Track matched cards
+
+# Game loop
+running = True
+while running:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            x, y = pygame.mouse.get_pos()
+            for card in cards:
+                # Skip cards that are already found
+                if card in found:
+                    continue
+
+                if card.x <= x <= card.x + CARD_WIDTH and card.y <= y <= card.y + CARD_HEIGHT:
+                    if card.covered:  # Only allow flipping if the card is covered
+                        card.flip()
+                        if first_card is None:
+                            first_card = card
+                        elif second_card is None and card != first_card:
+                            second_card = card
+                            pygame.time.delay(500)  # Delay to allow the second card to be seen
+
+                            if first_card.content == second_card.content:
+                                found.extend([first_card, second_card])  # Add matched cards to found list
+                                first_card = None
+                                second_card = None
+                            else:
+                                first_card.flip()
+                                second_card.flip()
+                                first_card = None
+                                second_card = None
+
+    # Draw the game screen
+    screen.fill(BLACK)
+    for card in cards:
+        card.draw()
+    pygame.display.flip()

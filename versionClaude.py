@@ -88,10 +88,6 @@ while running:
                 text_rect = text.get_rect(center=rect.center)
                 WINDOW.blit(text, text_rect)
 
-    # Draw the score
-    score_text = pygame.font.Font(None, 36).render(f"Score: {score}", True, BLACK)
-    WINDOW.blit(score_text, (10, 10))
-
     # Update the display
     pygame.display.update()
 
