@@ -6,7 +6,7 @@ import time
 pygame.init()
 
 # Screen dimensions
-screen_width = 600
+screen_width = 650
 screen_height = 600
 screen = pygame.display.set_mode((screen_width, screen_height))
 
@@ -30,8 +30,12 @@ face_down = 0
 face_up = 1
 matched = 2
 
-# Load sound effect
+# Load sound effects
 match_sound = pygame.mixer.Sound("match_sound.wav")
+
+# Background music
+pygame.mixer.music.load("background_music.mp3")
+pygame.mixer.music.play(-1)
 
 def initialize_game():
     # Generate pairs of numbers and shuffle them
