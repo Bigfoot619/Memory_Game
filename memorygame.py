@@ -24,6 +24,8 @@ cards_columns = 4
 gap = 20
 reset_button = pygame.Rect(screen_width - 120, screen_height - 50, 100, 40)
 play_again_button = pygame.Rect(screen_width / 2 - 50, screen_height / 2 - 20, 100, 40)
+player_button_1 = pygame.Rect(screen_width / 4 - 50, screen_height / 2 - 20, 100, 40)
+player_button_2 = pygame.Rect(3 * screen_width / 4 - 50, screen_height / 2 - 20, 100, 40)
 
 # Card states
 face_down = 0
@@ -84,11 +86,23 @@ def draw_play_again():
     text = font.render('Play Again', True, white)
     screen.blit(text, text.get_rect(center=play_again_button.center))
 
+def draw_player_buttons():
+    font = pygame.font.Font(None, 30)
+    pygame.draw.rect(screen, green, player_button_1)
+    text = font.render('1 Player', True, black)
+    screen.blit(text, text.get_rect(center=player_button_1.center))
+
+    pygame.draw.rect(screen, green, player_button_2)
+    text = font.render('2 Players', True, black)
+    screen.blit(text, text.get_rect(center=player_button_2.center))
+
 def game_loop():
     global cards, start_time
     running = True
     first_selection = None
     all_matched = False
+    num_players = 0
+    current_player = 1
 
     while running:
         all_matched = all(card['state'] == matched for card in cards)
@@ -97,13 +111,22 @@ def game_loop():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if num_players == 0:
+                    if player_button_1.collidepoint(event.pos):
+                        num_players = 1
+                    elif player_button_2.collidepoint(event.pos):
+                        num_players = 2
+                    continue
+
                 if all_matched and play_again_button.collidepoint(event.pos):
                     cards, start_time = initialize_game()
                     all_matched = False
+                    current_player = 1
                     continue
                 if reset_button.collidepoint(event.pos):
                     cards, start_time = initialize_game()
                     all_matched = False
+                    current_player = 1
                     continue
                 for card in cards:
                     if card['rect'].collidepoint(event.pos) and card['state'] == face_down:
@@ -114,17 +137,27 @@ def game_loop():
                             if first_selection['value'] == card['value']:
                                 first_selection['state'] = card['state'] = matched
                                 match_sound.play()
+                                if num_players == 2:
+                                    continue
                             else:
                                 pygame.display.flip()
                                 time.sleep(0.7)
                                 first_selection['state'] = card['state'] = face_down
+                                if num_players == 2:
+                                    current_player = 2 if current_player == 1 else 1
                             first_selection = None
                         break
 
         screen.fill(white)
-        draw_cards()
-        draw_timer()
-        draw_reset_button()
+        if num_players == 0:
+            draw_player_buttons()
+        else:
+            draw_cards()
+            draw_timer()
+            draw_reset_button()
+            if num_players == 2:
+                player_turn_text = pygame.font.Font(None, 30).render(f'Player {current_player}\'s turn', True, black)
+                screen.blit(player_turn_text, (0, 0))
 
         if all_matched:
             font = pygame.font.Font(None, 60)
