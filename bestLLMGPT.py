@@ -31,6 +31,9 @@ face_down = 0
 face_up = 1
 matched = 2
 
+# Load sound effect
+match_sound = pygame.mixer.Sound("match_sound.wav")
+
 # Initialize card states
 cards = [{'rect': pygame.Rect(col * (card_size[0] + gap) + gap, row * (card_size[1] + gap) + gap, card_size[0], card_size[1]),
           'value': card_values.pop(),
@@ -78,6 +81,8 @@ def game_loop():
                         else:
                             if first_selection['value'] == card['value']:
                                 first_selection['state'] = card['state'] = matched
+                                # Play match sound effect
+                                match_sound.play()
                             else:
                                 pygame.display.flip()
                                 time.sleep(0.7)
