@@ -15,6 +15,7 @@ white = (255, 255, 255)
 gray = (200, 200, 200)
 green = (0, 255, 0)
 black = (0, 0, 0)
+red = (255, 0, 0)
 
 # Game Variables
 card_size = (100, 120)
@@ -22,6 +23,7 @@ cards_rows = 4
 cards_columns = 4
 gap = 20
 reset_button = pygame.Rect(screen_width - 120, screen_height - 50, 100, 40)
+play_again_button = pygame.Rect(screen_width / 2 - 50, screen_height / 2 - 20, 100, 40)
 
 # Card states
 face_down = 0
@@ -72,18 +74,32 @@ def draw_reset_button():
     text = font.render('Reset', True, black)
     screen.blit(text, text.get_rect(center=reset_button.center))
 
+def draw_play_again():
+    pygame.draw.rect(screen, red, play_again_button)
+    font = pygame.font.Font(None, 30)
+    text = font.render('Play Again', True, white)
+    screen.blit(text, text.get_rect(center=play_again_button.center))
+
 def game_loop():
     global cards, start_time
     running = True
     first_selection = None
+    all_matched = False
 
     while running:
+        all_matched = all(card['state'] == matched for card in cards)
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if all_matched and play_again_button.collidepoint(event.pos):
+                    cards, start_time = initialize_game()
+                    all_matched = False
+                    continue
                 if reset_button.collidepoint(event.pos):
                     cards, start_time = initialize_game()
+                    all_matched = False
                     continue
                 for card in cards:
                     if card['rect'].collidepoint(event.pos) and card['state'] == face_down:
@@ -105,6 +121,13 @@ def game_loop():
         draw_cards()
         draw_timer()
         draw_reset_button()
+
+        if all_matched:
+            font = pygame.font.Font(None, 60)
+            text = font.render('Well done!', True, green)
+            screen.blit(text, (screen_width / 2 - text.get_width() / 2, screen_height / 2 - 100))
+            draw_play_again()
+
         pygame.display.flip()
 
 if __name__ == "__main__":
