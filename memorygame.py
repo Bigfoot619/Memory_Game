@@ -37,7 +37,7 @@ home_button = pygame.Rect(640, screen_height - 60, 100, 50)
 current_player = 0
 num_players = 0
 voice_control_active = False  # Flag for voice control mode
-
+voice_recognition_thread = None  # Global variable to control the voice recognition thread
 
 # Card states
 face_down = 0
@@ -189,12 +189,17 @@ def terminate_voice_recognition():
     if p is not None:
         p.terminate()
 
-# Add voice recognition function
-def voice_recognition():
-    global rec, stream
-    if stream is None:
-        print("Voice recognition is not initialized.")
+def select_card_by_voice():
+    card_number = voice_recognition() - 1  # Subtract 1 for zero-based index
+    if 0 <= card_number < len(cards):
+        return cards[card_number]
+    else:
         return None
+
+# Function to handle voice recognition on a separate thread
+def voice_recognition():
+    global voice_control_active
+    global rec, stream
     try:
         while True:
             data = stream.read(4096, exception_on_overflow=False)
@@ -210,22 +215,16 @@ def voice_recognition():
                         return card_number
                     else:
                         print("Please say a number between 1 and 16.")
-
                 except ValueError:
                     print("Please say a number.")  # Feedback for unrecognized input
                     continue  # If conversion fails, keep listening
     except Exception as e:
-        print(f"An error occurred during voice recognition: {e}")
-
-def select_card_by_voice():
-    card_number = voice_recognition() - 1  # Subtract 1 for zero-based index
-    if 0 <= card_number < len(cards):
-        return cards[card_number]
-    else:
-        return None
+                print(f"An error occurred during voice recognition: {e}")
+        
 
 def game_loop():
     global cards, start_time, time_attack_mode, time_limit, voice_control_active
+
     running = True
     first_selection = None
     all_matched = False
@@ -234,7 +233,8 @@ def game_loop():
     selections_this_turn = 0  # Add a counter for selections in the current turn
     time_attack_mode = False
     time_limit = 60  # Time limit for time attack mode
-    
+    voice_initialization_flag = False
+
     while running:
         all_matched = all(card['state'] == matched for card in cards)
         time_up = time_attack_mode and (time.time() - start_time) > time_limit
@@ -279,6 +279,7 @@ def game_loop():
                         break
                     elif home_button.collidepoint(event.pos):
                         num_players = 0  # Reset to player selection
+                        voice_initialization_flag = False
                         continue
                     elif voice_control_button.collidepoint(event.pos):
                         num_players = 1
@@ -295,9 +296,10 @@ def game_loop():
                 if home_button.collidepoint(event.pos):
                     num_players = 0  # Reset to player selection
                     time_attack_mode = False
+                    voice_initialization_flag = False
                     voice_control_active = False  # Deactivate voice control
                     cards, start_time = initialize_game()
-                    continue
+                    # continue
                 if num_players == 0:
                     if player_button_1.collidepoint(event.pos):
                         num_players = 1
@@ -333,15 +335,13 @@ def game_loop():
 
                               if num_players == 2:
                                   current_player = 2 if current_player == 1 else 1
-                                  selections_this_turn = 0  # Reset selections for the next player
-                                  first_selection = None  # Reset first selection for the next turn
-                                 
+
+                              selections_this_turn = 0
+                              first_selection = None 
+                              
                           else:
                             first_selection = card  # Make current card the first selection
-                            
-                          if selections_this_turn == 2:  # Reset selections and first selection after two cards are selected
-                            selections_this_turn = 0
-                            first_selection = None 
+
                           break  # Exit the loop after dealing with the card
 
                 if all_matched and play_again_button.collidepoint(event.pos):
@@ -360,23 +360,36 @@ def game_loop():
                     if time_attack_mode:
                         time_limit = 60  # Reset time limit for time attack mode
                     
-
+                
                 if voice_control_active:
-                    print(voice_control_active)
-                    initialize_voice_recognition()
+                    if not voice_initialization_flag:
+                        voice_initialization_flag = True
+                        initialize_voice_recognition()
+                    
                     first_card = select_card_by_voice()
+
                     if first_card and first_card['state'] == face_down:
                         flip_card_animation(first_card, True)
+                        selections_this_turn += 1  # Increment selections count
+
                         second_card = select_card_by_voice()
+
                         if second_card and second_card != first_card and second_card['state'] == face_down:
                             flip_card_animation(second_card, True)
                             pygame.time.delay(400)  # Short delay to show the cards
+
                             if first_card['value'] == second_card['value']:
                                 first_card['state'] = second_card['state'] = matched
                                 match_sound.play()
                             else:
                                 flip_card_animation(first_card, False)
                                 flip_card_animation(second_card, False)
+                                
+                            selections_this_turn = 0
+                            first_selection = None
+
+                          
+
 
 
         screen.fill(white)
