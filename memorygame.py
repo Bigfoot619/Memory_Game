@@ -337,7 +337,11 @@ def game_loop():
                                   first_selection = None  # Reset first selection for the next turn
                                  
                           else:
-                              first_selection = card  # Make current card the first selection
+                            first_selection = card  # Make current card the first selection
+                            
+                          if selections_this_turn == 2:  # Reset selections and first selection after two cards are selected
+                            selections_this_turn = 0
+                            first_selection = None 
                           break  # Exit the loop after dealing with the card
 
                 if all_matched and play_again_button.collidepoint(event.pos):
