@@ -224,7 +224,7 @@ def voice_recognition():
 
 def game_loop():
     global cards, start_time, time_attack_mode, time_limit, voice_control_active
-
+    won_last_hand = 0
     running = True
     first_selection = None
     all_matched = False
@@ -328,13 +328,15 @@ def game_loop():
                                   # Cards match, keep them face up
                                   first_selection['state'] = card['state'] = matched
                                   match_sound.play()
+                                  won_last_hand = current_player
                               else:
                                   # Cards don't match, flip both back down
                                   flip_card_animation(first_selection, False)  # Flip first selection back down
                                   flip_card_animation(card, False)  # Flip current card back down
 
                               if num_players == 2:
-                                  current_player = 2 if current_player == 1 else 1
+                                 if won_last_hand != current_player:
+                                    current_player = 2 if current_player == 1 else 1
 
                               selections_this_turn = 0
                               first_selection = None 
