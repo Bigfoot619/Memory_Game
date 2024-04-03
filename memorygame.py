@@ -44,6 +44,8 @@ voice_commands = []
 players_matches = [0,0]
 message_start_time = None
 show_time_attack_message = False
+show_voice_control_message = True
+show_welcome_message = True
 
 
 # Card states
@@ -57,6 +59,7 @@ match_sound = pygame.mixer.Sound("match_sound.wav")
 # Background music
 pygame.mixer.music.load("background_music.mp3")
 pygame.mixer.music.play(-1)
+
 
 def initialize_game():
     # Generate pairs of numbers and shuffle them
@@ -131,13 +134,30 @@ def display_time_attack_message():
     message = "Time Attack Mode!\nYou have 60 seconds to match all cards\nSucceed, and the next level will have 5 seconds less.\nGood luck!"
     render_multiline_text(message, 20, 100, 40, red)
 
+def display_voice_control_message():
+    message = "Note\nIn Voice Control Mode\nChoose 2 cards based on their screen position\nThe top left card is 1, down right is 16.\nGood luck!"
+    render_multiline_text(message, 20, 450, 30, dark_blue)
+
+dark_blue = (0, 0, 128)
+
+def display_welcome_message():
+    message = "Welcome to Bigfoot's games!\nHave fun!\n"
+    render_multiline_text(message, 20, 100, 40, dark_blue)
+
+
 def render_multiline_text(text, x, y, font_size, color):
     font = pygame.font.Font(None, font_size)
+    font.set_bold(True)  # Make the font bold
     lines = text.split('\n')
     for line in lines:
         text_surface = font.render(line, True, color)
-        screen.blit(text_surface, (x, y))
-        y += font_size  # Move to the next line position
+        text_width = text_surface.get_width()
+        
+        # Calculate the x position for the text to be centered
+        centered_x = (screen_width - text_width) / 2
+        
+        screen.blit(text_surface, (centered_x, y))
+        y += font_size  # Adjust y-coordinate for the next line
 
 def draw_timer(time_attack_mode, time_limit):
     current_time = time.time()
@@ -252,7 +272,7 @@ def voice_recognition():
         
 
 def game_loop():
-    global cards, start_time, time_attack_mode, time_limit, voice_control_active, voice_commands, players_matches, num_players, message_start_time, show_time_attack_message
+    global cards, start_time, time_attack_mode, time_limit, voice_control_active, voice_commands, players_matches, num_players, message_start_time, show_time_attack_message, show_voice_control_message, show_welcome_message
     won_last_hand = 0
     running = True
     first_selection = None
@@ -260,9 +280,9 @@ def game_loop():
     current_player = 1
     selections_this_turn = 0  # Add a counter for selections in the current turn
     time_attack_mode = False
-    time_limit = 60  # Time limit for time attack mode
+    time_limit = 66  # Time limit for time attack mode
     voice_initialization_flag = False
-    
+    num_of_runs = 0
 
     while running:
         all_matched = all(card['state'] == matched for card in cards)
@@ -286,30 +306,39 @@ def game_loop():
                     num_players = 0  # Reset to player selection
                     time_attack_mode = False
                     voice_initialization_flag = False
+                    show_voice_control_message = True
+                    show_welcome_message = True
                     if voice_control_active:
                         terminate_voice_recognition()
                         pygame.mixer.music.play(-1)
                     cards, start_time = initialize_game()
-                    # continue
                 if num_players == 0:
                     if player_button_1.collidepoint(event.pos):
                         num_players = 1
+                        show_voice_control_message = False
+                        show_welcome_message = False
                     elif player_button_2.collidepoint(event.pos):
                         num_players = 2
+                        show_voice_control_message = False
+                        show_welcome_message = False
                         players_matches = [0 for _ in players_matches]
                     elif time_attack_button.collidepoint(event.pos):
                         num_players = 1
                         time_attack_mode = True
+                        num_of_runs = 1 
                         cards, start_time = initialize_game()
-                        time_limit = 60  # Reset time limit
                         message_start_time = pygame.time.get_ticks()  # Note the start time to track 3 seconds
-                        show_time_attack_message = True 
+                        show_voice_control_message = False
+                        show_time_attack_message = True
+                        show_welcome_message = False
 
                     elif voice_control_button.collidepoint(event.pos):
                         num_players = 1
                         pygame.mixer.music.stop()
-                        voice_control_active = True  # Activate voice control
+                        voice_control_active = True  # Activate voice control                      
                         cards, start_time = initialize_game()
+                        show_voice_control_message = False
+                        show_welcome_message = False
 
                 if not voice_control_active:
                     for card in cards:
@@ -345,11 +374,14 @@ def game_loop():
                           break  # Exit the loop after dealing with the card
 
                 if all_matched and play_again_button.collidepoint(event.pos):
+                    num_of_runs += 1
                     cards, start_time = initialize_game()
                     all_matched = False
                     current_player = 1
                     if time_attack_mode:
                         time_limit -= 5  # Decrease time limit for next round
+                        if num_of_runs == 2:
+                            time_limit = 55
                         if time_limit <= 0:
                             time_limit = 5  # Set a minimum time limit
                     
@@ -411,8 +443,14 @@ def game_loop():
         if show_time_attack_message:
             display_time_attack_message()
             current_time = pygame.time.get_ticks()
-            if current_time - message_start_time > 5000:  # 3 seconds have passed
+            if current_time - message_start_time > 6000:  
                 show_time_attack_message = False
+
+        if show_voice_control_message:
+            display_voice_control_message()
+
+        if show_welcome_message:
+            display_welcome_message()
 
         pygame.display.flip()
 
