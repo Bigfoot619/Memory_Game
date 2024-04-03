@@ -21,6 +21,7 @@ gray = (200, 200, 200)
 green = (0, 255, 0)
 black = (0, 0, 0)
 red = (255, 0, 0)
+navy_blue = (0, 0, 128)
 
 # Game Variables
 card_size = (100, 120)
@@ -35,7 +36,6 @@ time_attack_button = pygame.Rect(300, screen_height - 60, 140, 50)
 voice_control_button = pygame.Rect(460, screen_height - 60, 160, 50)  # Adjusted for visibility
 home_button = pygame.Rect(640, screen_height - 60, 100, 50)
 
-current_player = 0
 num_players = 0
 voice_control_active = False  # Flag for voice control mode
 voice_recognition_thread = None  # Global variable to control the voice recognition thread
@@ -46,7 +46,6 @@ message_start_time = None
 show_time_attack_message = False
 show_voice_control_message = True
 show_welcome_message = True
-
 
 # Card states
 face_down = 0
@@ -92,72 +91,6 @@ def draw_home_button():
     font = pygame.font.Font(None, 30)
     text = font.render('Home', True, black)
     screen.blit(text, text.get_rect(center=home_button.center))
-
-def flip_card_animation(card, flip_to_face_up=True):
-    global screen, cards, start_time, time_attack_mode, time_limit  # Ensure these global variables are accessible
-    original_rect = card['rect'].copy()  # Copy the original rect to restore it after animation
-    steps = 10  # Number of steps in the animation for smoothness
-    for step in range(steps, 0, -1):
-        card['rect'].width = original_rect.width * step // steps
-        if card['rect'].width == 0:  # Avoid having width 0 which would make the rect invisible
-            card['rect'].width = 1
-        card['rect'].centerx = original_rect.centerx
-        screen.fill(white)
-        draw_cards()
-        draw_timer(time_attack_mode, time_limit)  # Draw timer after updating screen
-        draw_reset_button()  # Draw reset button after updating screen
-        draw_home_button()
-
-        pygame.display.flip()
-        pygame.time.delay(10)
-
-    if flip_to_face_up:
-        card['state'] = face_up
-    else:
-        card['state'] = face_down
-
-    for step in range(1, steps + 1):
-        card['rect'].width = original_rect.width * step // steps
-        card['rect'].centerx = original_rect.centerx
-        screen.fill(white)
-        draw_cards()
-        draw_timer(time_attack_mode, time_limit)  # Draw timer after updating screen
-        draw_reset_button()  # Draw reset button after updating screen
-        draw_home_button()
-
-        pygame.display.flip()
-        pygame.time.delay(15)
-
-    card['rect'] = original_rect  # Restore the original rect dimensions and position
-
-def display_time_attack_message():
-    message = "Time Attack Mode!\nYou have 60 seconds to match all cards\nSucceed, and the next level will have 5 seconds less.\nGood luck!"
-    render_multiline_text(message, 20, 100, 40, red)
-
-def display_voice_control_message():
-    message = "Note\nIn Voice Control Mode\nChoose 2 cards based on their screen position\nThe top left card is 1, down right is 16.\nGood luck!"
-    render_multiline_text(message, 20, 450, 30, dark_blue)
-
-dark_blue = (0, 0, 128)
-
-def display_welcome_message():
-    message = "Welcome to Bigfoot's games!\nHave fun!\n"
-    render_multiline_text(message, 20, 100, 40, dark_blue)
-
-
-def render_multiline_text(text, x, y, font_size, color):
-    font = pygame.font.Font(None, font_size)
-    font.set_bold(True)  # Make the font bold
-    lines = text.split('\n')
-    for line in lines:
-        text_surface = font.render(line, True, color)
-        text_width = text_surface.get_width()
-        
-        # Calculate the x position for the text to be centered
-        centered_x = (screen_width - text_width) / 2
-        
-        screen.blit(text_surface, (centered_x, y))
-        y += font_size  # Adjust y-coordinate for the next line
 
 def draw_timer(time_attack_mode, time_limit):
     current_time = time.time()
@@ -218,12 +151,74 @@ def draw_scores(player1_score, player2_score):
     screen.blit(score_text_1, (score_x_position - score_text_1.get_width(), score_y_position_1))  # Right-align text
     screen.blit(score_text_2, (score_x_position - score_text_2.get_width(), score_y_position_2))  # Right-align text
 
+def display_time_attack_message():
+    message = "Time Attack Mode!\nYou have 60 seconds to match all cards\nSucceed, and the next level will have 5 seconds less.\nGood luck!"
+    render_multiline_text(message, 20, 100, 40, red)
+
+def display_voice_control_message():
+    message = "Note\nIn Voice Control Mode\nChoose 2 cards based on their screen position\nThe top left card is 1, down right is 16.\nGood luck!"
+    render_multiline_text(message, 20, 450, 30, navy_blue)
+
+def display_welcome_message():
+    message = "Welcome to Bigfoot's games!\nHave fun!\n"
+    render_multiline_text(message, 20, 100, 40, navy_blue)
+
+def render_multiline_text(text, x, y, font_size, color):
+    font = pygame.font.Font(None, font_size)
+    font.set_bold(True)  # Make the font bold
+    lines = text.split('\n')
+    for line in lines:
+        text_surface = font.render(line, True, color)
+        text_width = text_surface.get_width()
+        
+        # Calculate the x position for the text to be centered
+        centered_x = (screen_width - text_width) / 2
+        
+        screen.blit(text_surface, (centered_x, y))
+        y += font_size  # Adjust y-coordinate for the next line
+
+def flip_card_animation(card, flip_to_face_up=True):
+    global screen, cards, start_time, time_attack_mode, time_limit  # Ensure these global variables are accessible
+    original_rect = card['rect'].copy()  # Copy the original rect to restore it after animation
+    steps = 10  # Number of steps in the animation for smoothness
+    for step in range(steps, 0, -1):
+        card['rect'].width = original_rect.width * step // steps
+        if card['rect'].width == 0:  # Avoid having width 0 which would make the rect invisible
+            card['rect'].width = 1
+        card['rect'].centerx = original_rect.centerx
+        screen.fill(white)
+        draw_cards()
+        draw_timer(time_attack_mode, time_limit)  # Draw timer after updating screen
+        draw_reset_button()  # Draw reset button after updating screen
+        draw_home_button()
+
+        pygame.display.flip()
+        pygame.time.delay(10)
+
+    if flip_to_face_up:
+        card['state'] = face_up
+    else:
+        card['state'] = face_down
+
+    for step in range(1, steps + 1):
+        card['rect'].width = original_rect.width * step // steps
+        card['rect'].centerx = original_rect.centerx
+        screen.fill(white)
+        draw_cards()
+        draw_timer(time_attack_mode, time_limit)  # Draw timer after updating screen
+        draw_reset_button()  # Draw reset button after updating screen
+        draw_home_button()
+
+        pygame.display.flip()
+        pygame.time.delay(15)
+
+    card['rect'] = original_rect  # Restore the original rect dimensions and position
+
 # Global voice model and stream variables
 model = None
 rec = None
 p = None
 stream = None
-
 
 def initialize_voice_recognition():
     global model, rec, p, stream, voice_recognition_thread, voice_control_active
