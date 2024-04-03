@@ -42,6 +42,9 @@ voice_recognition_thread = None  # Global variable to control the voice recognit
 voice_command_result = None  # Holds the result from voice recognition
 voice_commands = []
 players_matches = [0,0]
+message_start_time = None
+show_time_attack_message = False
+
 
 # Card states
 face_down = 0
@@ -124,7 +127,18 @@ def flip_card_animation(card, flip_to_face_up=True):
 
     card['rect'] = original_rect  # Restore the original rect dimensions and position
 
-        
+def display_time_attack_message():
+    message = "Time Attack Mode!\nYou have 60 seconds to match all cards\nSucceed, and the next level will have 5 seconds less.\nGood luck!"
+    render_multiline_text(message, 20, 100, 40, red)
+
+def render_multiline_text(text, x, y, font_size, color):
+    font = pygame.font.Font(None, font_size)
+    lines = text.split('\n')
+    for line in lines:
+        text_surface = font.render(line, True, color)
+        screen.blit(text_surface, (x, y))
+        y += font_size  # Move to the next line position
+
 def draw_timer(time_attack_mode, time_limit):
     current_time = time.time()
     if time_attack_mode:
@@ -238,7 +252,7 @@ def voice_recognition():
         
 
 def game_loop():
-    global cards, start_time, time_attack_mode, time_limit, voice_control_active, voice_commands, players_matches, num_players
+    global cards, start_time, time_attack_mode, time_limit, voice_control_active, voice_commands, players_matches, num_players, message_start_time, show_time_attack_message
     won_last_hand = 0
     running = True
     first_selection = None
@@ -248,6 +262,7 @@ def game_loop():
     time_attack_mode = False
     time_limit = 60  # Time limit for time attack mode
     voice_initialization_flag = False
+    
 
     while running:
         all_matched = all(card['state'] == matched for card in cards)
@@ -262,49 +277,6 @@ def game_loop():
             draw_timer(time_attack_mode, time_limit)  # Ensure timer is visible
             draw_reset_button()  # Ensure reset button is visible
             pygame.display.flip()
-            while True:
-                event = pygame.event.wait()
-                if event.type == pygame.QUIT:
-                    running = False
-                    break
-                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    if play_again_button.collidepoint(event.pos):
-                        cards, start_time = initialize_game()
-                        running = True  # Ensure the game loop continues
-                        time_attack_mode = True  # Keep in time attack mode
-                        time_limit = 60 # Reset time limit
-                        break
-                    if player_button_1.collidepoint(event.pos):
-                        num_players = 1
-                        time_attack_mode = False
-                        cards, start_time = initialize_game()
-                        break
-                    elif player_button_2.collidepoint(event.pos):
-                        num_players = 2
-                        time_attack_mode = False
-                        players_matches = [0 for _ in players_matches]
-                        cards, start_time = initialize_game()
-                        break
-                    elif time_attack_button.collidepoint(event.pos):
-                        num_players = 1
-                        time_attack_mode = True
-                        cards, start_time = initialize_game()
-                        time_limit = 60 # Reset time limit
-                        break
-                    elif home_button.collidepoint(event.pos):
-                        if voice_control_active:
-                            terminate_voice_recognition()
-                            pygame.mixer.music.play(-1)
-                        num_players = 0  # Reset to player selection
-                        voice_initialization_flag = False
-                        continue
-                    elif voice_control_button.collidepoint(event.pos):
-                        num_players = 1
-                        time_attack_mode = False
-                        voice_control_active = True  # Activate voice control
-                        pygame.mixer.music.stop()
-                        cards, start_time = initialize_game()
-                        time_limit = 60 # Reset time limit
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -330,6 +302,9 @@ def game_loop():
                         time_attack_mode = True
                         cards, start_time = initialize_game()
                         time_limit = 60  # Reset time limit
+                        message_start_time = pygame.time.get_ticks()  # Note the start time to track 3 seconds
+                        show_time_attack_message = True 
+
                     elif voice_control_button.collidepoint(event.pos):
                         num_players = 1
                         pygame.mixer.music.stop()
@@ -418,6 +393,7 @@ def game_loop():
         else:
             draw_cards()
             draw_reset_button()
+
         if num_players == 2:
             draw_scores(players_matches[0], players_matches[1])
             player_turn_text = pygame.font.Font(None, 30).render(f'Player {current_player}\'s turn', True, black)
@@ -426,12 +402,17 @@ def game_loop():
         draw_timer(time_attack_mode, time_limit)  # Draw timer after updating screen
         draw_home_button()
        
-
         if all_matched:
             font = pygame.font.Font(None, 60)
             text = font.render('Well done!', True, green)
             screen.blit(text, (screen_width / 2 - text.get_width() / 2, screen_height / 2 - 100))
             draw_play_again()
+
+        if show_time_attack_message:
+            display_time_attack_message()
+            current_time = pygame.time.get_ticks()
+            if current_time - message_start_time > 5000:  # 3 seconds have passed
+                show_time_attack_message = False
 
         pygame.display.flip()
 
