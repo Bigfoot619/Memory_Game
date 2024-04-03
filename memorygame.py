@@ -5,6 +5,7 @@ import time
 from vosk import Model, KaldiRecognizer
 import json
 from word2number import w2n
+import threading
 
 # Initialize Pygame
 pygame.init()
@@ -38,6 +39,9 @@ current_player = 0
 num_players = 0
 voice_control_active = False  # Flag for voice control mode
 voice_recognition_thread = None  # Global variable to control the voice recognition thread
+voice_command_result = None  # Holds the result from voice recognition
+voice_commands = []
+players_matches = [0,0]
 
 # Card states
 face_down = 0
@@ -87,7 +91,6 @@ def flip_card_animation(card, flip_to_face_up=True):
     global screen, cards, start_time, time_attack_mode, time_limit  # Ensure these global variables are accessible
     original_rect = card['rect'].copy()  # Copy the original rect to restore it after animation
     steps = 10  # Number of steps in the animation for smoothness
-
     for step in range(steps, 0, -1):
         card['rect'].width = original_rect.width * step // steps
         if card['rect'].width == 0:  # Avoid having width 0 which would make the rect invisible
@@ -167,68 +170,79 @@ def draw_player_buttons():
     text = font.render('Voice Control', True, black)
     screen.blit(text, text.get_rect(center=voice_control_button.center))
 
+def draw_scores(player1_score, player2_score):
+    font = pygame.font.Font(None, 40)
+    score_text_1 = font.render(f'Player 1: {player1_score}', True, black)
+    score_text_2 = font.render(f'Player 2: {player2_score}', True, black)
+
+    # Calculate positions for the score displays on the right side of the screen
+    score_x_position = screen_width - 150  # X position for scores, 150 pixels from the right edge
+    score_y_position_1 = 50  # Y position for player 1 score, placed below the timer with some padding
+    score_y_position_2 = 90  # Y position for player 2 score, placed below player 1 score with some spacing
+
+    # Position the score displays on the screen
+    screen.blit(score_text_1, (score_x_position - score_text_1.get_width(), score_y_position_1))  # Right-align text
+    screen.blit(score_text_2, (score_x_position - score_text_2.get_width(), score_y_position_2))  # Right-align text
+
 # Global voice model and stream variables
 model = None
 rec = None
 p = None
 stream = None
 
+
 def initialize_voice_recognition():
-    global model, rec, p, stream
-    model = Model("vosk-model-small-en-us-0.15")  # Path might need adjustment based on your setup
+    global model, rec, p, stream, voice_recognition_thread, voice_control_active
+    model = Model("vosk-model-small-en-us-0.15")
     rec = KaldiRecognizer(model, 16000)
     p = pyaudio.PyAudio()
     stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=8192)
     stream.start_stream()
+    if voice_recognition_thread is None or not voice_recognition_thread.is_alive():
+        voice_control_active = True
+        voice_recognition_thread = threading.Thread(target=voice_recognition, daemon=True)
+        voice_recognition_thread.start()
 
 def terminate_voice_recognition():
-    global stream, p
+    global voice_control_active, voice_recognition_thread, stream, p
+    voice_control_active = False
+    if voice_recognition_thread is not None:
+        voice_recognition_thread.join()
     if stream is not None:
         stream.stop_stream()
         stream.close()
     if p is not None:
         p.terminate()
 
-def select_card_by_voice():
-    card_number = voice_recognition() - 1  # Subtract 1 for zero-based index
-    if 0 <= card_number < len(cards):
-        return cards[card_number]
-    else:
-        return None
-
 # Function to handle voice recognition on a separate thread
 def voice_recognition():
-    global voice_control_active
-    global rec, stream
+    global voice_control_active, rec, stream, voice_command_result, voice_commands
     try:
-        while True:
+        while voice_control_active:
             data = stream.read(4096, exception_on_overflow=False)
-            if len(data) == 0:
+            if len(data) == 0 or not voice_control_active:
                 break
             if rec.AcceptWaveform(data):
                 result = json.loads(rec.Result())
                 text = result.get("text", "")
                 try:
                     card_number = w2n.word_to_num(text)
-                    # Ensure the number is within the range of cards 1-16
                     if 1 <= card_number <= 16:
-                        return card_number
+                        voice_commands.append(card_number)
                     else:
                         print("Please say a number between 1 and 16.")
                 except ValueError:
-                    print("Please say a number.")  # Feedback for unrecognized input
-                    continue  # If conversion fails, keep listening
+                    print("Please say a number between 1 and 16")
     except Exception as e:
-                print(f"An error occurred during voice recognition: {e}")
+        print(f"An error occurred during voice recognition: {e}")
         
 
 def game_loop():
-    global cards, start_time, time_attack_mode, time_limit, voice_control_active
+    global cards, start_time, time_attack_mode, time_limit, voice_control_active, voice_commands, players_matches, num_players
     won_last_hand = 0
     running = True
     first_selection = None
     all_matched = False
-    num_players = 0
     current_player = 1
     selections_this_turn = 0  # Add a counter for selections in the current turn
     time_attack_mode = False
@@ -248,7 +262,6 @@ def game_loop():
             draw_timer(time_attack_mode, time_limit)  # Ensure timer is visible
             draw_reset_button()  # Ensure reset button is visible
             pygame.display.flip()
-            num_players = 0  # Ensure player buttons are reactivated
             while True:
                 event = pygame.event.wait()
                 if event.type == pygame.QUIT:
@@ -269,6 +282,7 @@ def game_loop():
                     elif player_button_2.collidepoint(event.pos):
                         num_players = 2
                         time_attack_mode = False
+                        players_matches = [0 for _ in players_matches]
                         cards, start_time = initialize_game()
                         break
                     elif time_attack_button.collidepoint(event.pos):
@@ -278,6 +292,9 @@ def game_loop():
                         time_limit = 60 # Reset time limit
                         break
                     elif home_button.collidepoint(event.pos):
+                        if voice_control_active:
+                            terminate_voice_recognition()
+                            pygame.mixer.music.play(-1)
                         num_players = 0  # Reset to player selection
                         voice_initialization_flag = False
                         continue
@@ -297,7 +314,9 @@ def game_loop():
                     num_players = 0  # Reset to player selection
                     time_attack_mode = False
                     voice_initialization_flag = False
-                    voice_control_active = False  # Deactivate voice control
+                    if voice_control_active:
+                        terminate_voice_recognition()
+                        pygame.mixer.music.play(-1)
                     cards, start_time = initialize_game()
                     # continue
                 if num_players == 0:
@@ -305,6 +324,7 @@ def game_loop():
                         num_players = 1
                     elif player_button_2.collidepoint(event.pos):
                         num_players = 2
+                        players_matches = [0 for _ in players_matches]
                     elif time_attack_button.collidepoint(event.pos):
                         num_players = 1
                         time_attack_mode = True
@@ -329,13 +349,16 @@ def game_loop():
                                   first_selection['state'] = card['state'] = matched
                                   match_sound.play()
                                   won_last_hand = current_player
+                                  players_matches[current_player - 1] += 1
+
                               else:
                                   # Cards don't match, flip both back down
                                   flip_card_animation(first_selection, False)  # Flip first selection back down
                                   flip_card_animation(card, False)  # Flip current card back down
+                                  won_last_hand = None
 
                               if num_players == 2:
-                                 if won_last_hand != current_player:
+                                if won_last_hand != current_player:
                                     current_player = 2 if current_player == 1 else 1
 
                               selections_this_turn = 0
@@ -357,52 +380,49 @@ def game_loop():
                     
                 if reset_button.collidepoint(event.pos):
                     cards, start_time = initialize_game()
+                    if (num_players == 2):
+                        players_matches = [0 for _ in players_matches]
                     all_matched = False
                     current_player = 1
                     if time_attack_mode:
                         time_limit = 60  # Reset time limit for time attack mode
                     
                 
-                if voice_control_active:
-                    if not voice_initialization_flag:
-                        voice_initialization_flag = True
-                        initialize_voice_recognition()
-                    
-                    first_card = select_card_by_voice()
-
-                    if first_card and first_card['state'] == face_down:
-                        flip_card_animation(first_card, True)
-                        selections_this_turn += 1  # Increment selections count
-
-                        second_card = select_card_by_voice()
-
+        if voice_control_active:
+            if not voice_initialization_flag:
+                voice_initialization_flag = True
+                initialize_voice_recognition()
+            if len(voice_commands) > 1:
+                first_card_number = voice_commands.pop(0) - 1 
+                first_card = cards[first_card_number]
+                if first_card and first_card['state'] == face_down:
+                    flip_card_animation(first_card, True)
+                    if len(voice_commands) > 0:
+                        second_card_number = voice_commands.pop(0) - 1 
+                        second_card = cards[second_card_number]
                         if second_card and second_card != first_card and second_card['state'] == face_down:
                             flip_card_animation(second_card, True)
                             pygame.time.delay(400)  # Short delay to show the cards
-
                             if first_card['value'] == second_card['value']:
                                 first_card['state'] = second_card['state'] = matched
                                 match_sound.play()
                             else:
                                 flip_card_animation(first_card, False)
-                                flip_card_animation(second_card, False)
-                                
-                            selections_this_turn = 0
+                                flip_card_animation(second_card, False)  
                             first_selection = None
-
-                          
-
 
 
         screen.fill(white)
-        if num_players == 2:
-            player_turn_text = pygame.font.Font(None, 30).render(f'Player {current_player}\'s turn', True, black)
-            screen.blit(player_turn_text, (0, 0))
         if num_players == 0:
             draw_player_buttons()
         else:
             draw_cards()
             draw_reset_button()
+        if num_players == 2:
+            draw_scores(players_matches[0], players_matches[1])
+            player_turn_text = pygame.font.Font(None, 30).render(f'Player {current_player}\'s turn', True, black)
+            screen.blit(player_turn_text, (0, 0))
+
         draw_timer(time_attack_mode, time_limit)  # Draw timer after updating screen
         draw_home_button()
        
