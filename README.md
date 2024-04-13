@@ -44,10 +44,6 @@ Ensure you also have the Vosk model downloaded:
 - **Mouse Click**: Interact with buttons and cards.
 - **Voice Commands**: In voice control mode, say card numbers to flip them.
 
-## Screenshots
-
-> Insert screenshots of the game here.
-
 ## Contributing
 
 Contributions to the Memory Card Game are welcome! Please feel free to fork the repository, make changes, and submit a pull request.
