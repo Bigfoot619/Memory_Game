@@ -7,7 +7,7 @@ import json
 from word2number import w2n
 import threading
 
-# Initialize Pygame
+# Initialize Pygame for graphics handling
 pygame.init()
 
 # Screen dimensions
@@ -254,9 +254,12 @@ def voice_recognition():
             if rec.AcceptWaveform(data):
                 result = json.loads(rec.Result())
                 text = result.get("text", "")
+                print(text)
                 try:
                     card_number = w2n.word_to_num(text)
+                    print(card_number)
                     if 1 <= card_number <= 16:
+
                         voice_commands.append(card_number)
                     else:
                         print("Please say a number between 1 and 16.")
@@ -283,6 +286,7 @@ def game_loop():
         all_matched = all(card['state'] == matched for card in cards)
         time_up = time_attack_mode and (time.time() - start_time) > time_limit
 
+        #attack mode - time's up and not all cards are matched
         if time_up and not all_matched:
             screen.fill(white)
             font = pygame.font.Font(None, 60)
@@ -293,10 +297,12 @@ def game_loop():
             draw_reset_button()  # Ensure reset button is visible
             pygame.display.flip()
 
+        # tracking events in game
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                #Home button
                 if home_button.collidepoint(event.pos):
                     num_players = 0  # Reset to player selection
                     time_attack_mode = False
@@ -308,15 +314,18 @@ def game_loop():
                         pygame.mixer.music.play(-1)
                     cards, start_time = initialize_game()
                 if num_players == 0:
+                    #1 Player button
                     if player_button_1.collidepoint(event.pos):
                         num_players = 1
                         show_voice_control_message = False
                         show_welcome_message = False
+                    #2 Players button
                     elif player_button_2.collidepoint(event.pos):
                         num_players = 2
                         show_voice_control_message = False
                         show_welcome_message = False
                         players_matches = [0 for _ in players_matches]
+                        #Time attack button
                     elif time_attack_button.collidepoint(event.pos):
                         num_players = 1
                         time_attack_mode = True
@@ -326,7 +335,7 @@ def game_loop():
                         show_voice_control_message = False
                         show_time_attack_message = True
                         show_welcome_message = False
-
+                    #Voice control button
                     elif voice_control_button.collidepoint(event.pos):
                         num_players = 1
                         pygame.mixer.music.stop()
@@ -335,6 +344,7 @@ def game_loop():
                         show_voice_control_message = False
                         show_welcome_message = False
 
+                # Flipping cards when in normal modes - by mouse
                 if not voice_control_active:
                     for card in cards:
                       if card['rect'].collidepoint(event.pos) and card['state'] == face_down:
@@ -367,7 +377,8 @@ def game_loop():
                             first_selection = card  # Make current card the first selection
 
                           break  # Exit the loop after dealing with the card
-
+                      
+                #Time attack mode all cards matched and play_again is triggerd
                 if all_matched and play_again_button.collidepoint(event.pos):
                     num_of_runs += 1
                     cards, start_time = initialize_game()
@@ -379,7 +390,8 @@ def game_loop():
                             time_limit = 55
                         if time_limit <= 0:
                             time_limit = 5  # Set a minimum time limit
-                    
+
+                #reset button trigger
                 if reset_button.collidepoint(event.pos):
                     cards, start_time = initialize_game()
                     if (num_players == 2):
@@ -389,7 +401,7 @@ def game_loop():
                     if time_attack_mode:
                         time_limit = 60  # Reset time limit for time attack mode
                     
-                
+        #Voice control flipping and matching cards logic
         if voice_control_active:
             if not voice_initialization_flag:
                 voice_initialization_flag = True
@@ -413,7 +425,7 @@ def game_loop():
                                 flip_card_animation(second_card, False)  
                             first_selection = None
 
-
+        #Redraw everything
         screen.fill(white)
         if num_players == 0:
             draw_player_buttons()
